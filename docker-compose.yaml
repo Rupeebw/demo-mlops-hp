@@ -1,0 +1,39 @@
+services:
+  # FastAPI Service - ML Model API
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: house-price-api
+    ports:
+      - "8000:8000"
+    networks:
+      - house-price-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # Streamlit Service - Web UI
+  streamlit:
+    build:
+      context: ./streamlit_app
+      dockerfile: Dockerfile
+    container_name: house-price-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://fastapi:8000
+    networks:
+      - house-price-network
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  house-price-network:
+    driver: bridge

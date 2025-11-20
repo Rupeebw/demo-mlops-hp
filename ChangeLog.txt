@@ -1,4 +1,180 @@
 ===============================================================================
+                            📋 TL;DR - QUICK START
+===============================================================================
+
+🚀 ONE-COMMAND DEPLOYMENT:
+   docker compose up -d
+
+📍 ACCESS POINTS:
+   • Streamlit UI:  http://localhost:8501  (Web Interface)
+   • FastAPI:       http://localhost:8000  (REST API)
+   • MLflow:        http://localhost:5555  (Experiment Tracking)
+
+✅ VERIFICATION:
+   curl http://localhost:8000/health
+   # Expected: {"status":"healthy","model_loaded":true}
+
+📦 WHAT'S INCLUDED:
+   • FastAPI service (ML model predictions API)
+   • Streamlit web UI (user-friendly interface)
+   • Docker Compose orchestration with health checks
+   • Automatic service discovery and networking
+   • scikit-learn 1.6.1 for model compatibility
+
+📂 NEW FILES:
+   • Dockerfile (FastAPI service)
+   • streamlit_app/Dockerfile (Streamlit UI)
+   • docker-compose.yaml (orchestration)
+   • Updated requirements.txt (pinned scikit-learn==1.6.1)
+
+🛑 STOP SERVICES:
+   docker compose down
+
+📖 For detailed documentation, see sections below ⬇️
+
+===============================================================================
+
+===============================================================================
+  DOCKER COMPOSE ORCHESTRATION - 2025-11-20
+===============================================================================
+
+Summary:
+Successfully created and deployed docker-compose.yaml to orchestrate both FastAPI
+and Streamlit services with proper networking and health checks.
+
+What Was Done:
+
+1. Created docker-compose.yaml file in project root:
+   - Orchestrates FastAPI (port 8000) and Streamlit (port 8501) services
+   - Custom bridge network: house-price-network
+   - Automatic service discovery (Streamlit connects to FastAPI via service name)
+   - Health checks for FastAPI service with Python-based HTTP check
+   - Dependency management: Streamlit waits for FastAPI to be healthy
+   - Auto-restart policy: unless-stopped
+
+2. Service Configuration:
+   FastAPI Service:
+   - Container name: house-price-api
+   - Health check using Python urllib (no curl dependency)
+   - 20s start period, 30s interval, 3 retries
+
+   Streamlit Service:
+   - Container name: house-price-streamlit
+   - Environment: API_URL=http://fastapi:8000
+   - Depends on FastAPI health check
+
+3. Deployed and Verified:
+   - Both services running and healthy
+   - Network communication working correctly
+   - API predictions working via docker-compose networking
+   - Streamlit can access FastAPI via service name
+
+-------------------------------------------------------------------------------
+DOCKER COMPOSE COMMANDS:
+-------------------------------------------------------------------------------
+
+# Start all services (build if needed):
+docker compose up -d
+
+# Start with rebuild:
+docker compose up -d --build
+
+# View running services:
+docker compose ps
+
+# View logs (all services):
+docker compose logs -f
+
+# View logs (specific service):
+docker compose logs -f fastapi
+docker compose logs -f streamlit
+
+# Stop all services:
+docker compose down
+
+# Stop and remove volumes:
+docker compose down -v
+
+# Restart services:
+docker compose restart
+
+# Check service health:
+docker compose ps
+
+-------------------------------------------------------------------------------
+TESTING THE DEPLOYMENT:
+-------------------------------------------------------------------------------
+
+# Test FastAPI health endpoint:
+curl http://localhost:8000/health
+
+# Test FastAPI prediction:
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sqft": 2000,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "location": "urban",
+    "year_built": 2015,
+    "condition": "excellent"
+  }'
+
+# Expected Response:
+# {"predicted_price":566340.0,"confidence_interval":[509706.0,622974.0],...}
+
+# Access Streamlit UI:
+# Open browser: http://localhost:8501
+
+-------------------------------------------------------------------------------
+DEPLOYMENT STATUS:
+-------------------------------------------------------------------------------
+
+✅ FastAPI Service: http://localhost:8000 (healthy)
+✅ Streamlit UI: http://localhost:8501 (running)
+✅ Docker Network: house-price-network (bridge)
+
+Service Details:
+- fastapi: house-price-api container on port 8000
+- streamlit: house-price-streamlit container on port 8501
+- Network: Services communicate via Docker DNS (fastapi hostname)
+
+-------------------------------------------------------------------------------
+ARCHITECTURE:
+-------------------------------------------------------------------------------
+
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker Compose Stack                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────────┐         ┌──────────────────┐         │
+│  │   Streamlit UI   │────────>│   FastAPI API    │         │
+│  │   Port: 8501     │         │   Port: 8000     │         │
+│  │                  │         │                  │         │
+│  │  house-price-    │  HTTP   │  house-price-    │         │
+│  │  streamlit       │         │  api             │         │
+│  └──────────────────┘         └──────────────────┘         │
+│         │                              │                     │
+│         └──────────────┬───────────────┘                     │
+│                        │                                     │
+│              house-price-network                             │
+│                   (bridge)                                   │
+└─────────────────────────────────────────────────────────────┘
+         │                        │
+         │                        │
+    localhost:8501          localhost:8000
+
+-------------------------------------------------------------------------------
+Notes:
+- Services communicate via Docker network using service names (fastapi, streamlit)
+- Health checks ensure FastAPI is ready before Streamlit starts
+- No need for host.docker.internal or IP addresses with docker-compose
+- Services restart automatically unless manually stopped
+- Logs are aggregated and accessible via docker compose logs
+
+===============================================================================
+
+===============================================================================
   STREAMLIT APP DOCKER DEPLOYMENT - 2025-11-20
 ===============================================================================
 

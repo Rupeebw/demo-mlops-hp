@@ -1,3 +1,161 @@
+===============================================================================
+  STREAMLIT APP DOCKER DEPLOYMENT - 2025-11-20
+===============================================================================
+
+Summary:
+Successfully created, built, and deployed the Streamlit web application Docker container.
+
+What Was Done:
+
+1. Created Dockerfile (streamlit_app/Dockerfile) following the specifications from README:
+   - Base image: python:3.9-slim
+   - Working directory: /app
+   - Copied all files from streamlit_app directory (app.py, requirements.txt, .streamlit config)
+   - Installed dependencies from requirements.txt
+   - Exposed port 8501
+   - Launch command: streamlit run app.py --server.address=0.0.0.0
+
+2. Built Docker Image:
+   - Successfully built image: house-price-streamlit
+   - All dependencies installed (streamlit, requests, pyarrow, altair, pandas, etc.)
+   - Image optimized with --no-cache-dir flag
+
+3. Deployed and Verified:
+   - Container running on port 8501
+   - Connected to FastAPI service via API_URL=http://host.docker.internal:8000
+   - Streamlit app is accessible and operational
+
+-------------------------------------------------------------------------------
+STREAMLIT APP BUILD & RUN COMMANDS:
+-------------------------------------------------------------------------------
+
+# Build the Streamlit image:
+cd streamlit_app
+docker build -t house-price-streamlit .
+
+# Run the container (standalone):
+docker run -p 8501:8501 house-price-streamlit
+
+# Run with FastAPI connection (recommended - use host.docker.internal for Mac/Windows):
+docker run -p 8501:8501 -e API_URL=http://host.docker.internal:8000 house-price-streamlit
+
+# For Linux, use host network or the host IP:
+docker run -p 8501:8501 -e API_URL=http://172.17.0.1:8000 house-price-streamlit
+
+# Access the Streamlit app:
+# Open browser: http://localhost:8501
+
+# Verify both containers are running:
+docker ps
+
+-------------------------------------------------------------------------------
+DEPLOYMENT STATUS:
+-------------------------------------------------------------------------------
+
+✅ FastAPI Service: Running on http://localhost:8000
+✅ Streamlit UI: Running on http://localhost:8501
+✅ MLflow Server: Running on http://localhost:5555
+
+Container Details:
+- house-price-api: Port 8000 (predictions API)
+- house-price-streamlit: Port 8501 (web interface)
+
+-------------------------------------------------------------------------------
+Notes:
+- The Streamlit app connects to the FastAPI service via the API_URL environment variable
+- Default API_URL is http://model:8000 (for docker-compose networking)
+- For standalone containers on Mac/Windows, use host.docker.internal instead of localhost
+- For Linux, use the Docker bridge IP (typically 172.17.0.1) or host network mode
+
+===============================================================================
+
+===============================================================================
+  FASTAPI DOCKER DEPLOYMENT - 2025-11-20
+===============================================================================
+
+Summary:
+Successfully created and deployed the FastAPI Docker container for house price prediction.
+
+What Was Done:
+
+1. Created Dockerfile (/Dockerfile) following the specifications from the API README:
+   - Base image: python:3.11-slim
+   - Working directory: /app
+   - Installed dependencies from requirements.txt
+   - Copied API source files and trained models
+   - Exposed port 8000
+   - Launch command: uvicorn main:app --host 0.0.0.0 --port 8000
+
+2. Fixed scikit-learn Version Compatibility:
+   - Updated requirements.txt to pin scikit-learn==1.6.1 to match the trained models
+   - Rebuilt the Docker image with the correct version
+
+3. Successfully Deployed:
+   - Container is running on port 8000
+   - Health check endpoint working: {"status":"healthy","model_loaded":true}
+   - Prediction endpoint working successfully with test data
+
+-------------------------------------------------------------------------------
+API VERIFICATION COMMANDS:
+-------------------------------------------------------------------------------
+
+# Build the Docker image:
+docker build -t house-price-api .
+
+# Run the container:
+docker run -p 8000:8000 house-price-api
+
+# Test Health Check endpoint:
+curl http://localhost:8000/health
+
+# Expected Response:
+# {"status":"healthy","model_loaded":true}
+
+# Test Prediction endpoint:
+curl -X POST "http://localhost:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sqft": 1500,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "location": "suburban",
+    "year_built": 2000,
+    "condition": "fair"
+  }'
+
+# Expected Response:
+# {"predicted_price":429840.0,"confidence_interval":[386856.0,472824.0],"features_importance":{},"prediction_time":"2025-11-20T10:47:33.665754"}
+
+-------------------------------------------------------------------------------
+API Endpoints Available:
+-------------------------------------------------------------------------------
+
+- Health Check: GET http://localhost:8000/health
+- Prediction: POST http://localhost:8000/predict
+- Batch Prediction: POST http://localhost:8000/batch-predict
+
+The Docker container is now running and ready to serve house price predictions!
+
+===============================================================================
+  
+Created the Dockerfile at the root of your project. Here's what it does:
+
+  Key Features:
+  - Base Image: python:3.11-slim as specified
+  - Working Directory: /app
+  - Dependencies: Installs from requirements.txt
+  - API Files: Copies main.py, schemas.py, and inference.py from src/api/
+  - Models: Copies both trained model files from models/trained/
+  - Port: Exposes port 8000
+  - Launch: Uses uvicorn main:app --host 0.0.0.0 --port 8000
+
+  The container structure matches the expected layout from the README with all
+  files under /app and models in the models/trained/ subdirectory.
+
+  You can build and run it with:
+  docker build -t house-price-api .
+  docker run -p 8000:8000 house-price-api
+
 Excellent! The model training completed successfully! 🎉
 
   Training Results:

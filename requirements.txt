@@ -7,7 +7,7 @@ numpy>=1.26.0          # Numerical operations, arrays, and matrix support (Pytho
 # ---------------------------------------------
 # 🧠 MACHINE LEARNING
 # ---------------------------------------------
-scikit-learn>=1.3.0    # Classic ML models (regression, classification, clustering), preprocessing, model evaluation
+scikit-learn==1.6.1    # Classic ML models (regression, classification, clustering), preprocessing, model evaluation - pinned for model compatibility
 xgboost>=2.0.0         # Gradient boosting framework (Python 3.13 compatible)
 # ---------------------------------------------
 # 📈 VISUALIZATION

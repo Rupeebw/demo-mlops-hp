@@ -1,0 +1,60 @@
+Excellent! The model training completed successfully! 🎉
+
+  Training Results:
+
+  ✅ Model: RandomForest✅ Performance Metrics:
+  - MAE (Mean Absolute Error): $14,381.25
+  - R² Score: 0.9825 (98.25% - excellent fit!)
+
+  MLflow Tracking:
+  - Experiment created: house_price_model
+  - Run logged at:
+  http://localhost:5555/#/experiments/2/runs/3df5e95e1d5b411cba8b2b2f2347888c
+  - Model registered in MLflow Model Registry as version 1
+  - Model transitioned to "Staging" stage
+
+  Artifacts Saved:
+  - Trained model: models/trained/house_price_model.pkl
+  - MLflow experiment tracking at http://localhost:5555
+
+  Note: There's a deprecation warning about model registry stages - this is
+  just a heads-up that MLflow will change this feature in future versions, but
+  it works fine for now.
+
+  ---
+  Next Steps - Deployment Options:
+
+  1. Test the FastAPI service:
+    - Build and run the Docker container
+    - Test predictions via REST API
+  2. Launch Streamlit UI:
+    - Deploy the web interface
+    - Test predictions through the browser
+  3. View MLflow UI:
+    - Visit http://localhost:5555 to see experiment tracking and registered
+  models
+
+  The feature engineering script executed successfully. Here's what
+  was accomplished:
+
+  ✅ Feature Engineering Complete
+
+  Features Created:
+  - house_age: Calculated from year_built
+  - price_per_sqft: Price normalized by square footage
+  - bed_bath_ratio: Bedrooms to bathrooms ratio
+
+  Processing Summary:
+  - Input: 77 rows from cleaned data
+  - Output: 77 rows with 10 features (original + engineered)
+  - Preprocessor fitted and saved to models/trained/preprocessor.pkl
+  - Transformed data saved to data/processed/featured_house_data.csv
+
+  Next Steps:
+  You can now proceed with model training:
+
+  python3 src/models/train_model.py \
+    --config configs/model_config.yaml \
+    --data data/processed/featured_house_data.csv \
+    --models-dir models \
+    --mlflow-tracking-uri http://localhost:5555

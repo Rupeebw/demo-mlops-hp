@@ -1,0 +1,216 @@
+================================================================================
+HOUSE PRICE PREDICTOR - MLOps PROJECT STRUCTURE
+================================================================================
+
+house-price-predictor-mlops-main/
+│
+├── README.md                          # Project overview and setup instructions
+├── LICENSE                            # Project license information
+├── CLAUDE.md                          # Claude Code AI assistant instructions
+├── requirements.txt                   # Python dependencies for the project
+│
+├── .claude/                           # Claude Code configuration directory
+│
+├── configs/                           # Configuration files directory
+│   └── model_config.yaml              # Model hyperparameters and settings
+│
+├── data/                              # Data storage directory
+│   ├── raw/                           # Original, immutable data
+│   │   └── house_data.csv             # Source dataset with house features
+│   └── processed/                     # Cleaned and transformed data
+│       ├── README.md                  # Processing documentation
+│       ├── cleaned_house_data.csv     # After data cleaning pipeline
+│       └── featured_house_data.csv    # After feature engineering pipeline
+│
+├── notebooks/                         # Jupyter notebooks for exploration
+│   ├── 00_data_engineering.ipynb      # Data cleaning and validation
+│   ├── 01_exploratory_data_analysis.ipynb  # EDA and insights
+│   ├── 02_feature_engineering.ipynb   # Feature creation experiments
+│   └── 03_experimentation.ipynb       # Model training experiments
+│
+├── src/                               # Source code directory
+│   ├── data/                          # Data processing scripts
+│   │   └── run_processing.py          # Cleans raw data, handles outliers
+│   │
+│   ├── features/                      # Feature engineering scripts
+│   │   └── engineer.py                # Creates features, saves preprocessor
+│   │
+│   ├── models/                        # Model training scripts
+│   │   └── train_model.py             # Trains models, logs to MLflow
+│   │
+│   └── api/                           # FastAPI inference service
+│       ├── main.py                    # FastAPI endpoints (predict, health)
+│       ├── inference.py               # Loads model, performs predictions
+│       ├── schemas.py                 # Pydantic request/response models
+│       ├── utils.py                   # Helper functions
+│       ├── requirements.txt           # API-specific dependencies
+│       └── README.md                  # API documentation
+│
+├── models/                            # Trained model artifacts
+│   └── trained/                       # Production-ready models
+│       ├── README.md                  # Model versioning info
+│       ├── house_price_model.pkl      # Trained regression model
+│       └── preprocessor.pkl           # Fitted sklearn preprocessor
+│
+├── streamlit_app/                     # Streamlit UI application
+│   ├── app.py                         # Main Streamlit interface
+│   ├── requirements.txt               # Streamlit dependencies
+│   ├── README.md                      # UI documentation
+│   ├── Dockerfile                     # Container for Streamlit app
+│   └── .streamlit/                    # Streamlit configuration
+│       └── config.toml                # UI theme and settings
+│
+├── deployment/                        # Deployment configurations
+│   ├── mlflow/                        # MLflow tracking server
+│   │   └── docker-compose.yaml        # MLflow server containerization
+│   │
+│   └── kubernetes/                    # K8s deployment manifests
+│       └── README.md                  # K8s deployment guide
+│
+├── tests/                             # Unit and integration tests
+│   ├── test_data_processing.py        # Tests for data pipeline
+│   ├── test_feature_engineering.py    # Tests for feature creation
+│   ├── test_model_training.py         # Tests for model training
+│   └── test_api.py                    # Tests for API endpoints
+│
+├── docker-compose.yaml                # Multi-service deployment (API + UI)
+├── Dockerfile                         # Container for FastAPI service
+└── docs/                              # Project documentation
+    └── project-structure.txt          # This file
+
+
+================================================================================
+DATA FLOW PIPELINE
+================================================================================
+
+1. DATA PROCESSING (src/data/run_processing.py)
+   Input:  data/raw/house_data.csv
+   Output: data/processed/cleaned_house_data.csv
+   Tasks:  Handle missing values, remove outliers, validate data
+
+2. FEATURE ENGINEERING (src/features/engineer.py)
+   Input:  data/processed/cleaned_house_data.csv
+   Output: data/processed/featured_house_data.csv
+           models/trained/preprocessor.pkl
+   Tasks:  Create derived features, fit preprocessor, transform data
+
+3. MODEL TRAINING (src/models/train_model.py)
+   Input:  data/processed/featured_house_data.csv
+           configs/model_config.yaml
+   Output: models/trained/house_price_model.pkl
+   Tasks:  Train models, log to MLflow, register best model
+
+4. INFERENCE (src/api/inference.py)
+   Input:  models/trained/house_price_model.pkl
+           models/trained/preprocessor.pkl
+   Output: Price predictions with confidence intervals
+   Tasks:  Load models, recreate features, transform input, predict
+
+
+================================================================================
+KEY FEATURES
+================================================================================
+
+ENGINEERED FEATURES:
+- house_age         = current_year - year_built
+- price_per_sqft    = price / sqft
+- bed_bath_ratio    = bedrooms / bathrooms
+
+NUMERICAL FEATURES:
+- sqft, bedrooms, bathrooms, house_age, price_per_sqft, bed_bath_ratio
+
+CATEGORICAL FEATURES:
+- location (one-hot encoded)
+- condition (one-hot encoded)
+
+
+================================================================================
+DEPLOYMENT ARCHITECTURE
+================================================================================
+
+┌──────────────────────────────────────────────────────────────┐
+│  MLflow Tracking Server (localhost:5555)                     │
+│  - Tracks experiments, parameters, metrics                   │
+│  - Stores model artifacts                                    │
+│  - Model registry (Staging/Production)                       │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  FastAPI Service (localhost:8000)                            │
+│  Endpoints:                                                  │
+│  - GET  /health        : Health check                        │
+│  - POST /predict       : Single prediction                   │
+│  - POST /batch-predict : Batch predictions                   │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  Streamlit UI (localhost:8501)                               │
+│  - User-friendly web interface                               │
+│  - Input house features via forms                            │
+│  - Display predictions with confidence intervals             │
+│  - Connects to FastAPI backend                               │
+└──────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+TECHNOLOGY STACK
+================================================================================
+
+ML/DATA:        pandas, numpy, scikit-learn, xgboost
+TRACKING:       MLflow
+API:            FastAPI, Pydantic, uvicorn
+UI:             Streamlit
+CONTAINERIZATION: Docker, Docker Compose
+ORCHESTRATION:  Kubernetes (optional)
+TESTING:        pytest
+NOTEBOOK:       Jupyter Lab
+
+
+================================================================================
+QUICK START COMMANDS
+================================================================================
+
+# Setup Environment
+uv venv --python python3.11
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# Start MLflow Server
+cd deployment/mlflow
+docker compose up -d
+
+# Run ML Pipeline
+python src/data/run_processing.py --input data/raw/house_data.csv --output data/processed/cleaned_house_data.csv
+python src/features/engineer.py --input data/processed/cleaned_house_data.csv --output data/processed/featured_house_data.csv --preprocessor models/trained/preprocessor.pkl
+python src/models/train_model.py --config configs/model_config.yaml --data data/processed/featured_house_data.csv --models-dir models --mlflow-tracking-uri http://localhost:5555
+
+# Run Tests
+pytest
+
+# Deploy Services
+docker compose up -d
+
+# Access Services
+MLflow UI:    http://localhost:5555
+FastAPI:      http://localhost:8000
+API Docs:     http://localhost:8000/docs
+Streamlit UI: http://localhost:8501
+
+
+================================================================================
+BEST PRACTICES
+================================================================================
+
+1. Always run pipelines in order: processing → engineering → training
+2. Retrain preprocessor when modifying feature engineering
+3. Use MLflow for experiment tracking and model versioning
+4. Test locally before containerization
+5. Keep feature engineering consistent between training and inference
+6. Version control model artifacts via MLflow Model Registry
+7. Use configuration files for model hyperparameters
+8. Document data transformations and feature definitions
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================

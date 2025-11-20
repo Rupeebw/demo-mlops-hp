@@ -1,0 +1,59 @@
+# Ignore Python bytecode and cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Ignore virtual environment
+venv/
+.venv/
+.env/
+.envrc
+env/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore VS Code config
+.vscode/
+
+# Ignore PyCharm config
+.idea/
+
+# Ignore logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore test coverage reports
+htmlcov/
+.coverage
+coverage.xml
+.cache
+
+# Ignore build/output directories
+build/
+dist/
+*.egg-info/
+
+# Ignore all .pkl files (models, preprocessors, etc.)
+*.pkl
+
+# Ignore MLflow artifacts
+mlruns/
+mlartifacts/
+deployment/mlflow/mlruns/
+deployment/mlflow/mlartifacts/
+
+# Ignore data files (optional - uncomment if you want to exclude data)
+# data/raw/
+# data/processed/
+# data/external/
+
+# Ignore trained model artifacts
+models/trained/*.pkl
+models/trained/*.joblib
+

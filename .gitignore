@@ -57,3 +57,6 @@ deployment/mlflow/mlartifacts/
 models/trained/*.pkl
 models/trained/*.joblib
 
+# Ignore Claude Code configuration
+.claude/
+

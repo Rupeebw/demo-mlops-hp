@@ -5,10 +5,16 @@
 🚀 ONE-COMMAND DEPLOYMENT:
    docker compose up -d
 
+🤖 CI/CD PIPELINE:
+   • GitHub Actions: Automated ML pipeline (data → features → training)
+   • Triggers: Push to main/develop, PR, or manual workflow dispatch
+   • Artifacts: Processed data, preprocessor, trained model, MLflow logs
+
 📍 ACCESS POINTS:
    • Streamlit UI:  http://localhost:8501  (Web Interface)
    • FastAPI:       http://localhost:8000  (REST API)
    • MLflow:        http://localhost:5555  (Experiment Tracking)
+   • GitHub Actions: Repository → Actions tab
 
 ✅ VERIFICATION:
    curl http://localhost:8000/health
@@ -18,19 +24,210 @@
    • FastAPI service (ML model predictions API)
    • Streamlit web UI (user-friendly interface)
    • Docker Compose orchestration with health checks
+   • GitHub Actions ML pipeline (CI/CD automation)
    • Automatic service discovery and networking
    • scikit-learn 1.6.1 for model compatibility
 
-📂 NEW FILES:
+📂 KEY FILES:
    • Dockerfile (FastAPI service)
    • streamlit_app/Dockerfile (Streamlit UI)
    • docker-compose.yaml (orchestration)
-   • Updated requirements.txt (pinned scikit-learn==1.6.1)
+   • .github/workflows/ml-pipeline.yml (CI/CD pipeline)
+   • .claude/commands/update-changelog.md (custom slash command)
 
 🛑 STOP SERVICES:
    docker compose down
 
 📖 For detailed documentation, see sections below ⬇️
+
+===============================================================================
+
+===============================================================================
+  GITHUB ACTIONS ML PIPELINE - 2025-11-21
+===============================================================================
+
+Summary:
+Successfully created GitHub Actions workflow for automated ML pipeline from
+data processing through model training with comprehensive CI/CD automation.
+
+What Was Done:
+
+1. Created GitHub Actions Workflow (.github/workflows/ml-pipeline.yml):
+   - 4-job pipeline: Data Processing → Feature Engineering → Model Training → Summary
+   - Automated triggers: Push to main/develop, PRs, manual dispatch
+   - Artifact management with retention policies (7-30 days)
+   - Python 3.13 with dependency caching
+   - Health checks and verification at each step
+   - Comprehensive error handling and reporting
+
+2. Pipeline Jobs Configuration:
+
+   Job 1 - Data Processing:
+   - Runs src/data/run_processing.py
+   - Outputs: cleaned_house_data.csv
+   - Artifact: processed-data (7 days retention)
+
+   Job 2 - Feature Engineering:
+   - Runs src/features/engineer.py
+   - Depends on: data-processing
+   - Outputs: featured_house_data.csv, preprocessor.pkl
+   - Artifacts: featured-data, preprocessor (7 days retention)
+
+   Job 3 - Model Training:
+   - Runs src/models/train_model.py
+   - Depends on: feature-engineering
+   - Outputs: house_price_model.pkl, MLflow artifacts
+   - Artifacts: trained-model (30 days), mlflow-artifacts (30 days)
+   - Optional: Can be disabled via workflow dispatch
+
+   Job 4 - Pipeline Summary:
+   - Aggregates status from all jobs
+   - Creates GitHub Actions summary report
+   - Fails if any upstream job fails
+
+3. Updated Source Scripts:
+   - Modified src/data/run_processing.py to support CLI arguments
+   - Added argparse with --input and --output parameters
+   - Maintains backward compatibility
+
+4. Created Comprehensive Documentation:
+   - .github/workflows/README.md with full pipeline documentation
+   - Architecture diagrams and workflow visualization
+   - Manual execution instructions (UI and CLI)
+   - Artifact management guide
+   - Troubleshooting section
+   - Local testing instructions
+
+5. Created Custom Slash Command:
+   - .claude/commands/update-changelog.md
+   - Interactive changelog update command
+   - Maintains consistent formatting
+   - Usage: /update-changelog
+
+-------------------------------------------------------------------------------
+GITHUB ACTIONS WORKFLOW COMMANDS:
+-------------------------------------------------------------------------------
+
+# Trigger workflow manually (via GitHub CLI):
+gh workflow run ml-pipeline.yml
+
+# Run without model training:
+gh workflow run ml-pipeline.yml -f run_training=false
+
+# Run on specific branch:
+gh workflow run ml-pipeline.yml --ref develop
+
+# List recent workflow runs:
+gh run list --workflow=ml-pipeline.yml
+
+# View workflow run details:
+gh run view <run-id>
+
+# Watch running workflow:
+gh run watch <run-id>
+
+# Download all artifacts:
+gh run download <run-id>
+
+# Download specific artifact:
+gh run download <run-id> -n trained-model
+
+-------------------------------------------------------------------------------
+PIPELINE ARCHITECTURE:
+-------------------------------------------------------------------------------
+
+Workflow Triggers:
+├─ Push to main/develop (when src/, data/raw/, configs/ change)
+├─ Pull Requests to main/develop
+└─ Manual workflow_dispatch (with optional parameters)
+
+Pipeline Flow:
+┌─────────────────────┐
+│  Data Processing    │  ← Cleans raw CSV data
+│  (ubuntu-latest)    │     Artifact: processed-data.csv
+└──────────┬──────────┘
+           │ depends_on
+           ▼
+┌─────────────────────┐
+│ Feature Engineering │  ← Creates features & preprocessor
+│  (ubuntu-latest)    │     Artifacts: featured-data.csv, preprocessor.pkl
+└──────────┬──────────┘
+           │ depends_on
+           ▼
+┌─────────────────────┐
+│  Model Training     │  ← Trains model with MLflow
+│  (ubuntu-latest)    │     Artifacts: model.pkl, mlflow logs
+└──────────┬──────────┘
+           │ always()
+           ▼
+┌─────────────────────┐
+│ Pipeline Summary    │  ← Status report & validation
+│  (ubuntu-latest)    │     GitHub Actions Summary
+└─────────────────────┘
+
+-------------------------------------------------------------------------------
+ARTIFACTS & RETENTION:
+-------------------------------------------------------------------------------
+
+| Artifact          | Retention | Size (Approx) | Description                |
+|-------------------|-----------|---------------|----------------------------|
+| processed-data    | 7 days    | ~50 KB        | Cleaned CSV data           |
+| featured-data     | 7 days    | ~75 KB        | Engineered features CSV    |
+| preprocessor      | 7 days    | ~10 KB        | Sklearn preprocessor.pkl   |
+| trained-model     | 30 days   | ~500 KB       | Trained model.pkl          |
+| mlflow-artifacts  | 30 days   | ~1 MB         | MLflow experiment tracking |
+
+-------------------------------------------------------------------------------
+DEPLOYMENT STATUS:
+-------------------------------------------------------------------------------
+
+✅ GitHub Actions Workflow: Created and ready
+✅ Pipeline Jobs: 4 jobs configured with dependencies
+✅ Artifact Management: Automated upload/download between jobs
+✅ Documentation: Comprehensive README in .github/workflows/
+✅ CLI Support: All scripts support command-line arguments
+✅ Custom Commands: /update-changelog slash command available
+
+Pipeline Features:
+- Automatic triggers on code/data changes
+- Manual dispatch with parameters
+- Python dependency caching for faster runs
+- Comprehensive error handling and verification
+- GitHub Actions summary reports
+- MLflow integration for experiment tracking
+
+-------------------------------------------------------------------------------
+TESTING LOCALLY (Before Pushing):
+-------------------------------------------------------------------------------
+
+# Test data processing:
+python src/data/run_processing.py \
+  --input data/raw/house_data.csv \
+  --output data/processed/cleaned_house_data.csv
+
+# Test feature engineering:
+python src/features/engineer.py \
+  --input data/processed/cleaned_house_data.csv \
+  --output data/processed/featured_house_data.csv \
+  --preprocessor models/trained/preprocessor.pkl
+
+# Test model training:
+python src/models/train_model.py \
+  --config configs/model_config.yaml \
+  --data data/processed/featured_house_data.csv \
+  --models-dir models
+
+-------------------------------------------------------------------------------
+Notes:
+- Pipeline runs automatically on push to main/develop branches
+- Artifacts are stored in GitHub Actions for specified retention periods
+- Model training can be skipped using workflow dispatch parameter
+- All jobs run on Ubuntu latest with Python 3.13
+- Dependency caching speeds up subsequent runs
+- MLflow tracking uses local file storage (file:./mlruns)
+- Custom slash command /update-changelog simplifies changelog updates
+
+===============================================================================
 
 ===============================================================================
 

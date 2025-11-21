@@ -230,3 +230,13 @@ When modifying feature engineering logic:
 - Models are registered in MLflow Model Registry
 - Model transitions: None → Staging → Production (manual promotion recommended)
 - Experiment name matches model name from config
+
+## Code Generation Guidelines
+
+**IMPORTANT**: When generating any code, ALWAYS first refer to the relevant documentation files within the `/docs` directory to understand existing patterns, conventions, and best practices before implementation:
+
+- /docs/project-structure.txt
+
+## Code Commit Guidelines
+
+- Just stick to the changes done recently and dont include any extra message in the commit message

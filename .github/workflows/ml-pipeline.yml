@@ -1,0 +1,246 @@
+name: ML Pipeline - Data Processing to Model Training
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'src/**'
+      - 'data/raw/**'
+      - 'configs/**'
+      - 'requirements.txt'
+      - '.github/workflows/ml-pipeline.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      run_training:
+        description: 'Run model training'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  PYTHON_VERSION: '3.13'
+  UV_VERSION: '0.1.0'
+
+jobs:
+  # Job 1: Data Processing
+  data-processing:
+    name: Data Processing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create directories
+        run: |
+          mkdir -p data/processed
+          mkdir -p models/trained
+
+      - name: Run data processing
+        run: |
+          python src/data/run_processing.py \
+            --input data/raw/house_data.csv \
+            --output data/processed/cleaned_house_data.csv
+
+      - name: Verify processed data
+        run: |
+          if [ -f "data/processed/cleaned_house_data.csv" ]; then
+            echo "✅ Data processing successful"
+            wc -l data/processed/cleaned_house_data.csv
+          else
+            echo "❌ Data processing failed - output file not found"
+            exit 1
+          fi
+
+      - name: Upload processed data
+        uses: actions/upload-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed/cleaned_house_data.csv
+          retention-days: 7
+
+  # Job 2: Feature Engineering
+  feature-engineering:
+    name: Feature Engineering
+    runs-on: ubuntu-latest
+    needs: data-processing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download processed data
+        uses: actions/download-artifact@v4
+        with:
+          name: processed-data
+          path: data/processed/
+
+      - name: Create directories
+        run: |
+          mkdir -p data/processed
+          mkdir -p models/trained
+
+      - name: Run feature engineering
+        run: |
+          python src/features/engineer.py \
+            --input data/processed/cleaned_house_data.csv \
+            --output data/processed/featured_house_data.csv \
+            --preprocessor models/trained/preprocessor.pkl
+
+      - name: Verify feature engineering
+        run: |
+          if [ -f "data/processed/featured_house_data.csv" ] && [ -f "models/trained/preprocessor.pkl" ]; then
+            echo "✅ Feature engineering successful"
+            echo "Featured data rows:"
+            wc -l data/processed/featured_house_data.csv
+            echo "Preprocessor size:"
+            ls -lh models/trained/preprocessor.pkl
+          else
+            echo "❌ Feature engineering failed"
+            exit 1
+          fi
+
+      - name: Upload featured data
+        uses: actions/upload-artifact@v4
+        with:
+          name: featured-data
+          path: data/processed/featured_house_data.csv
+          retention-days: 7
+
+      - name: Upload preprocessor
+        uses: actions/upload-artifact@v4
+        with:
+          name: preprocessor
+          path: models/trained/preprocessor.pkl
+          retention-days: 7
+
+  # Job 3: Model Training
+  model-training:
+    name: Model Training
+    runs-on: ubuntu-latest
+    needs: feature-engineering
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_training == true || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download featured data
+        uses: actions/download-artifact@v4
+        with:
+          name: featured-data
+          path: data/processed/
+
+      - name: Create directories
+        run: |
+          mkdir -p models/trained
+          mkdir -p mlruns
+
+      - name: Train model
+        run: |
+          python src/models/train_model.py \
+            --config configs/model_config.yaml \
+            --data data/processed/featured_house_data.csv \
+            --models-dir models
+        env:
+          MLFLOW_TRACKING_URI: file:./mlruns
+
+      - name: Verify trained model
+        run: |
+          if [ -f "models/trained/house_price_model.pkl" ]; then
+            echo "✅ Model training successful"
+            echo "Model size:"
+            ls -lh models/trained/house_price_model.pkl
+          else
+            echo "❌ Model training failed"
+            exit 1
+          fi
+
+      - name: Upload trained model
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: models/trained/house_price_model.pkl
+          retention-days: 30
+
+      - name: Upload MLflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlflow-artifacts
+          path: mlruns/
+          retention-days: 30
+
+  # Job 4: Pipeline Summary
+  pipeline-summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [data-processing, feature-engineering, model-training]
+    if: always()
+
+    steps:
+      - name: Check pipeline status
+        run: |
+          echo "## 🚀 ML Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status:" >> $GITHUB_STEP_SUMMARY
+          echo "- Data Processing: ${{ needs.data-processing.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Feature Engineering: ${{ needs.feature-engineering.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Model Training: ${{ needs.model-training.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.data-processing.result }}" == "success" ] && \
+             [ "${{ needs.feature-engineering.result }}" == "success" ] && \
+             [ "${{ needs.model-training.result }}" == "success" ]; then
+            echo "### ✅ Pipeline completed successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Artifacts Generated:**" >> $GITHUB_STEP_SUMMARY
+            echo "- Processed Data" >> $GITHUB_STEP_SUMMARY
+            echo "- Featured Data" >> $GITHUB_STEP_SUMMARY
+            echo "- Preprocessor (pickle)" >> $GITHUB_STEP_SUMMARY
+            echo "- Trained Model (pickle)" >> $GITHUB_STEP_SUMMARY
+            echo "- MLflow Artifacts" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Pipeline failed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the failed job logs for details." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

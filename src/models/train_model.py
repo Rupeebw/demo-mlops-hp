@@ -55,9 +55,14 @@ def main(args):
         config = yaml.safe_load(f)
     model_cfg = config['model']
 
+    # Set MLflow tracking URI and experiment
     if args.mlflow_tracking_uri:
         mlflow.set_tracking_uri(args.mlflow_tracking_uri)
-        mlflow.set_experiment(model_cfg['name'])
+        logger.info(f"Using MLflow tracking URI: {args.mlflow_tracking_uri}")
+
+    # Set experiment (creates if it doesn't exist)
+    experiment = mlflow.set_experiment(model_cfg['name'])
+    logger.info(f"Using MLflow experiment: {experiment.name} (ID: {experiment.experiment_id})")
 
     # Load data
     data = pd.read_csv(args.data)

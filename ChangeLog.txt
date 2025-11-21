@@ -43,6 +43,146 @@
 ===============================================================================
 
 ===============================================================================
+  🚀 GITHUB ACTIONS ML PIPELINE ENHANCEMENTS - 2025-11-21
+===============================================================================
+
+Summary:
+Enhanced GitHub Actions ML pipeline with MLflow Docker integration, Docker image
+build/publish workflow, version tag triggers, and improved artifact management.
+
+What Was Done:
+
+1. Added MLflow Docker Setup in Model Training Job:
+   - Docker-based MLflow server (ghcr.io/mlflow/mlflow:latest)
+   - Runs on port 5000 with SQLite backend
+   - Health check with retry logic (10 attempts, 5s intervals)
+   - Automatic cleanup using if: always() condition
+   - Updated tracking URI from file:./mlruns to http://localhost:5000
+
+2. Added Build and Publish Docker Image Job:
+   - Conditional execution: runs only on main branch or version tags
+   - Environment: dev (uses DockerHub credentials)
+   - Downloads trained model and preprocessor artifacts
+   - Artifact verification step before build
+   - Docker Buildx setup for multi-platform builds
+   - DockerHub authentication with secrets
+   - Smart tag generation using docker/metadata-action:
+     * latest (for main branch)
+     * Semantic versioning (v1.0.0, 1.0)
+     * SHA-based tags (main-sha256:abc123)
+   - Build cache optimization for faster builds
+
+3. Added Version Tag Triggers:
+   - Pipeline now triggers on git tags matching v*.*.*
+   - Enables automated deployment on version releases
+   - Combined with existing push and PR triggers
+
+4. Added Preprocessor Download in Model Training:
+   - Downloads preprocessor artifact from feature-engineering job
+   - Ensures model training has access to fitted preprocessor
+   - Path: models/trained/preprocessor.pkl
+
+5. Updated Pipeline Summary Job:
+   - Now includes build-and-publish status
+   - Smart handling of conditional jobs (shows "skipped" when not running)
+   - Enhanced artifact list in summary report
+   - Better status reporting for all 5 jobs
+
+-------------------------------------------------------------------------------
+COMMANDS/INSTRUCTIONS:
+-------------------------------------------------------------------------------
+
+# Trigger pipeline with version tag (triggers build-and-publish):
+git tag v1.0.0
+git push origin v1.0.0
+
+# Push to main (triggers full pipeline with Docker build):
+git push origin main
+
+# Manual workflow trigger:
+gh workflow run ml-pipeline.yml
+
+# View Docker images in registry:
+# Visit: https://hub.docker.com/r/<username>/house-price-model
+
+-------------------------------------------------------------------------------
+MLFLOW DOCKER SETUP:
+-------------------------------------------------------------------------------
+
+# MLflow server starts automatically in GitHub Actions:
+docker pull ghcr.io/mlflow/mlflow:latest
+docker run -d -p 5000:5000 --name mlflow-server \
+  ghcr.io/mlflow/mlflow:latest \
+  mlflow server --host 0.0.0.0 --backend-store-uri sqlite:///mlflow.db
+
+# Health check (automatically retried):
+curl -f http://localhost:5000/health
+
+# Cleanup (automatic in pipeline):
+docker stop mlflow-server || true
+docker rm mlflow-server || true
+
+-------------------------------------------------------------------------------
+DOCKER IMAGE TAGGING STRATEGY:
+-------------------------------------------------------------------------------
+
+Tag Types Generated:
+├─ latest                    (main branch latest)
+├─ v1.0.0, 1.0              (semantic version tags)
+└─ main-sha256:abc123       (commit SHA for traceability)
+
+Example: Pushing tag v1.2.3 creates:
+- docker.io/<username>/house-price-model:latest
+- docker.io/<username>/house-price-model:v1.2.3
+- docker.io/<username>/house-price-model:1.2
+- docker.io/<username>/house-price-model:main-sha256:...
+
+-------------------------------------------------------------------------------
+DEPLOYMENT STATUS/RESULTS:
+-------------------------------------------------------------------------------
+
+✅ MLflow Docker Integration: Configured with health checks
+✅ Build and Publish Job: Created with DockerHub integration
+✅ Version Tag Triggers: Added v*.*.* pattern
+✅ Preprocessor Download: Added to model-training job
+✅ Pipeline Summary: Enhanced with build status
+✅ Environment Configuration: dev environment with DockerHub secrets
+
+Pipeline Architecture (Updated):
+┌─────────────────────┐
+│  Data Processing    │  ← Cleans raw CSV
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ Feature Engineering │  ← Creates features & preprocessor
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│  Model Training     │  ← Trains with MLflow Docker
+│  + MLflow Server    │     (NEW: Docker-based tracking)
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ Build & Publish     │  ← Builds & pushes Docker image
+│  (conditional)      │     (NEW: Only on main/tags)
+└──────────┬──────────┘
+           ▼
+┌─────────────────────┐
+│ Pipeline Summary    │  ← Enhanced status report
+└─────────────────────┘
+
+-------------------------------------------------------------------------------
+Notes:
+- Build-and-publish job only runs on main branch pushes or version tags
+- MLflow server uses ephemeral SQLite DB (resets each run)
+- Docker build cache improves build performance
+- Requires DOCKERHUB_USERNAME (var) and DOCKERHUB_TOKEN (secret) in dev environment
+- Preprocessor is now properly passed between feature-engineering and model-training
+- All jobs use latest GitHub Actions (v4, v5)
+
+===============================================================================
+
+===============================================================================
   GITHUB ACTIONS ML PIPELINE - 2025-11-21
 ===============================================================================
 

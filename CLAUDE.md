@@ -236,6 +236,8 @@ When modifying feature engineering logic:
 **IMPORTANT**: When generating any code, ALWAYS first refer to the relevant documentation files within the `/docs` directory to understand existing patterns, conventions, and best practices before implementation:
 
 - /docs/project-structure.txt
+- /docs/Dos-and-Dont-Rules.txt
+- /docs/mlops-pipeline-guide.txt
 
 ## Code Commit Guidelines
 

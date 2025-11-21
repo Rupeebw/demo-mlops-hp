@@ -1,0 +1,2 @@
+DON'T Rule
+- Don't write any readme.md or summary.md document until asked

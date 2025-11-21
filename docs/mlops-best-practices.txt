@@ -19,6 +19,7 @@ TABLE OF CONTENTS
 7. Common Pitfalls and How to Avoid Them
 8. Debugging and Troubleshooting
 9. Production Readiness Checklist
+10. GitHub Actions Secrets and Environment Variables Management
 
 ================================================================================
 1. MLOPS PIPELINE ARCHITECTURE PATTERNS
@@ -1018,6 +1019,389 @@ Tools:
 - Model Serving: BentoML, Seldon Core, KServe
 - Orchestration: Airflow, Prefect, Kubeflow
 - Monitoring: Evidently AI, WhyLabs, Arize
+
+================================================================================
+10. GITHUB ACTIONS SECRETS AND ENVIRONMENT VARIABLES MANAGEMENT
+================================================================================
+
+CRITICAL ISSUE: Missing Secrets in CI/CD Pipeline
+-------------------------------------------------
+PROBLEM: "Error: Password required" when trying to push Docker images to registry
+
+This is one of the most common issues when setting up CI/CD pipelines for ML
+projects that involve Docker image deployment.
+
+ROOT CAUSE:
+-----------
+❌ GitHub Actions workflow requires authentication credentials (secrets)
+❌ DockerHub (or other container registry) credentials not configured in GitHub
+❌ Secrets are not automatically available - must be explicitly set up
+❌ Confusion between repository variables and secrets
+
+UNDERSTANDING GITHUB SECRETS VS VARIABLES:
+-----------------------------------------
+
+Secrets (Encrypted, Sensitive):
+- Used for passwords, tokens, API keys
+- Never exposed in logs
+- Encrypted at rest
+- Examples: DOCKERHUB_TOKEN, AWS_SECRET_ACCESS_KEY, DATABASE_PASSWORD
+- Access: ${{ secrets.SECRET_NAME }}
+
+Variables (Plain Text, Non-Sensitive):
+- Used for configuration values
+- Visible in logs
+- Not encrypted
+- Examples: DOCKERHUB_USERNAME, ENVIRONMENT_NAME, API_URL
+- Access: ${{ vars.VARIABLE_NAME }}
+
+✓ DO: Use secrets for ALL sensitive data
+✓ DO: Use variables for non-sensitive configuration
+❌ DON'T: Put passwords in variables
+❌ DON'T: Hardcode credentials in workflow files
+
+
+SOLUTION: SETTING UP DOCKERHUB AUTHENTICATION FOR GITHUB ACTIONS
+----------------------------------------------------------------
+
+Step 1: Create DockerHub Access Token
+-------------------------------------
+
+1. Navigate to: https://hub.docker.com/
+2. Log in to your DockerHub account
+3. Go to: Account Settings → Security → Access Tokens
+4. Click "New Access Token"
+5. Configure token:
+   - Description: "GitHub Actions MLOps Pipeline" (or descriptive name)
+   - Access permissions: Select "Read, Write, Delete" or "Read & Write" (minimum)
+6. Click "Generate"
+7. **CRITICAL**: Copy the token immediately! You won't see it again
+8. Store token securely (password manager, secure note)
+
+✓ DO: Create tokens with minimal required permissions
+✓ DO: Use descriptive names for tokens
+✓ DO: Set expiration dates for tokens (security best practice)
+❌ DON'T: Share tokens or commit them to git
+❌ DON'T: Use your account password (use access tokens instead)
+
+
+Step 2: Add Secrets to GitHub Repository
+----------------------------------------
+
+METHOD 1: Via GitHub Web Interface
+----------------------------------
+
+1. Navigate to your repository: https://github.com/YOUR_USERNAME/YOUR_REPO
+2. Click "Settings" tab (top navigation)
+3. In left sidebar: "Secrets and variables" → "Actions"
+4. You'll see two tabs: "Secrets" and "Variables"
+
+5. Add Secret (for password/token):
+   a. Click "New repository secret"
+   b. Name: DOCKERHUB_TOKEN
+   c. Value: Paste the DockerHub access token from Step 1
+   d. Click "Add secret"
+
+6. Add Variable (for username):
+   a. Switch to "Variables" tab
+   b. Click "New repository variable"
+   c. Name: DOCKERHUB_USERNAME
+   d. Value: Your DockerHub username (e.g., "rupeebw")
+   e. Click "Add variable"
+
+✓ Secret names must match exactly what's in your workflow file
+✓ Secret names are case-sensitive: DOCKERHUB_TOKEN ≠ dockerhub_token
+
+
+METHOD 2: Via GitHub CLI (Command Line)
+---------------------------------------
+
+If you prefer command-line setup:
+
+```bash
+# Install GitHub CLI (if not already installed)
+# macOS: brew install gh
+# Linux: See https://cli.github.com/
+
+# Authenticate GitHub CLI
+gh auth login
+
+# Set the secret (you'll be prompted to enter the token)
+gh secret set DOCKERHUB_TOKEN
+
+# Alternative: Set from file or environment variable
+echo "YOUR_TOKEN_HERE" | gh secret set DOCKERHUB_TOKEN
+
+# Set the variable
+gh variable set DOCKERHUB_USERNAME --body "rupeebw"
+
+# Verify secrets are set (shows names only, not values)
+gh secret list
+gh variable list
+```
+
+
+Step 3: Using Secrets in GitHub Actions Workflow
+------------------------------------------------
+
+Example from your ml-pipeline.yml:
+
+```yaml
+- name: Log in to DockerHub Container Registry
+  uses: docker/login-action@v3
+  with:
+    registry: docker.io
+    username: ${{ vars.DOCKERHUB_USERNAME }}      # From Variables
+    password: ${{ secrets.DOCKERHUB_TOKEN }}      # From Secrets
+```
+
+✓ Secrets are accessed via: ${{ secrets.SECRET_NAME }}
+✓ Variables are accessed via: ${{ vars.VARIABLE_NAME }}
+❌ NEVER hardcode credentials: username: "rupeebw" (BAD!)
+
+
+Step 4: Verify and Re-run Failed Workflow
+-----------------------------------------
+
+After adding secrets:
+
+METHOD 1: Via GitHub Web Interface
+1. Go to "Actions" tab in your repository
+2. Click on the failed workflow run
+3. Click "Re-run failed jobs" or "Re-run all jobs"
+4. Monitor the workflow - it should now authenticate successfully
+
+METHOD 2: Via GitHub CLI
+```bash
+# List recent workflow runs
+gh run list
+
+# Re-run the latest failed run
+gh run rerun --failed
+
+# Watch the workflow progress
+gh run watch
+```
+
+
+ENVIRONMENT-SPECIFIC SECRETS (Advanced)
+---------------------------------------
+
+For different environments (dev, staging, production):
+
+1. In GitHub Settings → Environments
+2. Create environments: "dev", "staging", "production"
+3. Add environment-specific secrets and variables
+4. Add protection rules (e.g., require approval for production)
+
+In workflow file:
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production  # Uses production environment secrets
+    steps:
+      - name: Deploy
+        env:
+          API_KEY: ${{ secrets.API_KEY }}  # Uses production API_KEY
+```
+
+
+COMMON MISTAKES AND HOW TO AVOID THEM:
+--------------------------------------
+
+Mistake 1: Wrong Secret Name
+❌ Workflow uses: ${{ secrets.DOCKER_TOKEN }}
+❌ Secret named: DOCKERHUB_TOKEN
+✓ Solution: Names must match EXACTLY
+
+Mistake 2: Using Secret Instead of Variable (or vice versa)
+❌ Username in secrets: ${{ secrets.DOCKERHUB_USERNAME }}
+✓ Correct: ${{ vars.DOCKERHUB_USERNAME }}
+
+Mistake 3: Expired or Revoked Tokens
+❌ Token was deleted or expired in DockerHub
+✓ Solution: Create new token and update secret
+
+Mistake 4: Insufficient Permissions
+❌ Token only has "Read" permission, but workflow needs "Write"
+✓ Solution: Create token with appropriate permissions
+
+Mistake 5: Forgetting to Copy Token
+❌ Didn't save token when created (can't retrieve later)
+✓ Solution: Delete old token, create new one
+
+Mistake 6: Environment Not Set
+❌ Secret exists in environment "production" but job doesn't specify environment
+✓ Solution: Add environment: production to job
+
+
+SECURITY BEST PRACTICES:
+------------------------
+
+1. Token Management:
+   ✓ Use tokens with minimal required permissions
+   ✓ Set expiration dates for tokens (e.g., 90 days)
+   ✓ Rotate tokens regularly
+   ✓ Revoke unused tokens
+   ✓ Use separate tokens for different purposes
+
+2. Secret Hygiene:
+   ✓ Never commit secrets to git
+   ✓ Never print secrets in logs
+   ✓ Use .gitignore for sensitive files
+   ✓ Audit secret access regularly
+   ✓ Delete secrets when no longer needed
+
+3. Workflow Security:
+   ✓ Use specific action versions (not @latest)
+   ✓ Review third-party actions before using
+   ✓ Limit workflow permissions (use permissions: block)
+   ✓ Use environment protection rules for production
+   ✓ Enable branch protection rules
+
+4. Monitoring:
+   ✓ Monitor workflow runs for unauthorized access
+   ✓ Set up alerts for workflow failures
+   ✓ Review audit logs periodically
+
+
+TROUBLESHOOTING AUTHENTICATION ERRORS:
+--------------------------------------
+
+Error: "Error: Password required"
+Solution:
+1. Verify DOCKERHUB_TOKEN secret exists: gh secret list
+2. Check secret name matches workflow file exactly
+3. Ensure token is valid in DockerHub (not expired/revoked)
+4. Recreate token if necessary
+
+Error: "Error: denied: requested access to the resource is denied"
+Solution:
+1. Check DockerHub username is correct
+2. Verify token has Write permissions (not just Read)
+3. Ensure repository name in workflow matches DockerHub repo
+
+Error: "Error: Bad credentials"
+Solution:
+1. Token might be corrupted (extra spaces, newlines)
+2. Re-create secret by copying token exactly
+3. Ensure using token, not password
+
+Error: Secret not found in environment
+Solution:
+1. Add environment: to job definition
+2. Or move secret from environment-level to repository-level
+3. Check environment name matches exactly
+
+
+CHECKLIST FOR DOCKERHUB AUTHENTICATION SETUP:
+---------------------------------------------
+
+□ DockerHub account exists
+□ DockerHub access token created with Write permissions
+□ Token saved securely
+□ DOCKERHUB_TOKEN secret added to GitHub repository
+□ DOCKERHUB_USERNAME variable added to GitHub repository
+□ Secret names match workflow file exactly (case-sensitive)
+□ Workflow file references secrets correctly (${{ secrets.NAME }})
+□ Workflow tested and authentication successful
+□ Token expiration date noted (for future rotation)
+
+
+APPLYING THESE LEARNINGS TO OTHER SERVICES:
+-------------------------------------------
+
+The same pattern applies to other container registries and services:
+
+AWS ECR (Elastic Container Registry):
+```yaml
+- name: Configure AWS credentials
+  uses: aws-actions/configure-aws-credentials@v4
+  with:
+    aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+    aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    aws-region: us-east-1
+
+- name: Login to Amazon ECR
+  uses: aws-actions/amazon-ecr-login@v2
+```
+
+GitHub Container Registry (GHCR):
+```yaml
+- name: Log in to GitHub Container Registry
+  uses: docker/login-action@v3
+  with:
+    registry: ghcr.io
+    username: ${{ github.actor }}
+    password: ${{ secrets.GITHUB_TOKEN }}  # Automatically provided
+```
+
+Google Container Registry (GCR):
+```yaml
+- name: Authenticate to Google Cloud
+  uses: google-github-actions/auth@v2
+  with:
+    credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+```
+
+
+KEY TAKEAWAYS FOR CI/CD SECRETS:
+--------------------------------
+
+1. SEPARATION: Use secrets for sensitive data, variables for configuration
+
+2. SECURITY: Never commit secrets to git or expose in logs
+
+3. PERMISSIONS: Grant minimal required permissions to tokens
+
+4. NAMING: Secret names must match workflow references exactly
+
+5. ROTATION: Regularly rotate tokens and update secrets
+
+6. ENVIRONMENTS: Use environment-specific secrets for different stages
+
+7. TESTING: Always test authentication after adding secrets
+
+8. DOCUMENTATION: Document what secrets are needed for the pipeline
+
+9. MONITORING: Monitor workflow runs and audit secret access
+
+10. RECOVERY: Know how to recreate and update secrets when needed
+
+
+REAL-WORLD EXAMPLE: COMPLETE SETUP FLOW
+---------------------------------------
+
+Scenario: Setting up DockerHub authentication for ML pipeline
+
+1. Developer creates DockerHub access token (Step 1)
+2. Developer adds DOCKERHUB_TOKEN secret to GitHub (Step 2)
+3. Developer adds DOCKERHUB_USERNAME variable to GitHub (Step 2)
+4. Developer commits workflow file with docker/login-action (Step 3)
+5. GitHub Actions runs workflow, authenticates, pushes image (Step 4)
+6. Developer monitors workflow, verifies successful push (Step 4)
+7. Developer sets reminder to rotate token in 90 days (Security)
+
+Result: Automated Docker image builds and deployments to DockerHub! 🚀
+
+
+ADDITIONAL RESOURCES:
+--------------------
+
+GitHub Documentation:
+- Encrypted Secrets: https://docs.github.com/en/actions/security-guides/encrypted-secrets
+- Environment Variables: https://docs.github.com/en/actions/learn-github-actions/variables
+- GitHub CLI: https://cli.github.com/manual/gh_secret
+
+DockerHub Documentation:
+- Access Tokens: https://docs.docker.com/security/for-developers/access-tokens/
+- Docker Login Action: https://github.com/docker/login-action
+
+Security Resources:
+- OWASP Secrets Management: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+- GitHub Actions Security: https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
+
 
 ================================================================================
 END OF GUIDE

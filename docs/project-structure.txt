@@ -2,14 +2,24 @@
 HOUSE PRICE PREDICTOR - MLOps PROJECT STRUCTURE
 ================================================================================
 
-house-price-predictor-mlops-main/
+demo-mlops-project/
 │
 ├── README.md                          # Project overview and setup instructions
 ├── LICENSE                            # Project license information
 ├── CLAUDE.md                          # Claude Code AI assistant instructions
+├── ChangeLog.txt                      # Project changelog and deployment history
 ├── requirements.txt                   # Python dependencies for the project
+├── .gitignore                         # Git ignore patterns
+├── docker-compose.yaml                # Multi-service deployment (API + UI)
+├── Dockerfile                         # Container for FastAPI service
+├── setup_env.sh                       # Environment setup script
+├── libomp.dylib                       # OpenMP library symlink (macOS)
 │
-├── .claude/                           # Claude Code configuration directory
+│
+├── .github/                           # GitHub configuration
+│   └── workflows/                     # GitHub Actions workflows
+│       ├── ml-pipeline.yml            # Automated ML pipeline (CI/CD)
+│       └── README.md                  # Workflow documentation
 │
 ├── configs/                           # Configuration files directory
 │   └── model_config.yaml              # Model hyperparameters and settings
@@ -21,6 +31,11 @@ house-price-predictor-mlops-main/
 │       ├── README.md                  # Processing documentation
 │       ├── cleaned_house_data.csv     # After data cleaning pipeline
 │       └── featured_house_data.csv    # After feature engineering pipeline
+│
+├── docs/                              # Project documentation
+│   ├── project-structure.txt          # This file - complete directory tree
+│   ├── Dos-and-Dont-Rules.txt         # Project rules and guidelines
+│   └── mlops-best-practices.txt       # Comprehensive MLOps best practices
 │
 ├── notebooks/                         # Jupyter notebooks for exploration
 │   ├── 00_data_engineering.ipynb      # Data cleaning and validation
@@ -49,7 +64,7 @@ house-price-predictor-mlops-main/
 ├── models/                            # Trained model artifacts
 │   └── trained/                       # Production-ready models
 │       ├── README.md                  # Model versioning info
-│       ├── house_price_model.pkl      # Trained regression model
+│       ├── house_price_model.pkl      # Trained regression model (XGBoost)
 │       └── preprocessor.pkl           # Fitted sklearn preprocessor
 │
 ├── streamlit_app/                     # Streamlit UI application
@@ -60,23 +75,12 @@ house-price-predictor-mlops-main/
 │   └── .streamlit/                    # Streamlit configuration
 │       └── config.toml                # UI theme and settings
 │
-├── deployment/                        # Deployment configurations
-│   ├── mlflow/                        # MLflow tracking server
-│   │   └── docker-compose.yaml        # MLflow server containerization
-│   │
-│   └── kubernetes/                    # K8s deployment manifests
-│       └── README.md                  # K8s deployment guide
-│
-├── tests/                             # Unit and integration tests
-│   ├── test_data_processing.py        # Tests for data pipeline
-│   ├── test_feature_engineering.py    # Tests for feature creation
-│   ├── test_model_training.py         # Tests for model training
-│   └── test_api.py                    # Tests for API endpoints
-│
-├── docker-compose.yaml                # Multi-service deployment (API + UI)
-├── Dockerfile                         # Container for FastAPI service
-└── docs/                              # Project documentation
-    └── project-structure.txt          # This file
+└── deployment/                        # Deployment configurations
+    ├── mlflow/                        # MLflow tracking server
+    │   └── docker-compose.yaml        # MLflow server containerization
+    │
+    └── kubernetes/                    # K8s deployment manifests
+        └── README.md                  # K8s deployment guide
 
 
 ================================================================================
@@ -108,6 +112,63 @@ DATA FLOW PIPELINE
 
 
 ================================================================================
+GITHUB ACTIONS CI/CD PIPELINE
+================================================================================
+
+Workflow File: .github/workflows/ml-pipeline.yml
+
+Pipeline Stages:
+
+1. DATA PROCESSING JOB
+   - Checkout code
+   - Setup Python 3.11 with UV
+   - Install dependencies
+   - Run data processing script
+   - Upload cleaned data as artifact
+
+2. FEATURE ENGINEERING JOB
+   - Download cleaned data artifact
+   - Run feature engineering
+   - Create and save preprocessor
+   - Upload featured data and preprocessor as artifacts
+
+3. MODEL TRAINING JOB
+   - Download featured data and preprocessor
+   - Setup MLflow Docker server (port 5000)
+   - Wait for MLflow health check
+   - Train model with MLflow tracking
+   - Upload trained model and MLflow artifacts
+   - Cleanup MLflow container
+
+4. BUILD AND PUBLISH DOCKER IMAGE JOB (Conditional)
+   - Runs only on: main branch push OR version tags (v*.*.*)
+   - Download model and preprocessor artifacts
+   - Setup Docker Buildx
+   - Login to DockerHub
+   - Build and push Docker image with tags:
+     * latest (for main branch)
+     * Semantic versioning (v1.0.0, 1.0)
+     * SHA-based tags (main-sha256:...)
+   - Uses build cache for optimization
+
+5. PIPELINE SUMMARY JOB
+   - Aggregates all job statuses
+   - Displays pipeline success/failure
+   - Lists generated artifacts
+   - Notes Docker build status (success/skipped)
+
+Triggers:
+- Push to main or develop branches
+- Pull requests to main or develop
+- Version tags (v*.*.*)
+- Changes to: src/, data/raw/, configs/, .github/workflows/
+
+Environment Requirements:
+- DOCKERHUB_USERNAME (variable)
+- DOCKERHUB_TOKEN (secret)
+
+
+================================================================================
 KEY FEATURES
 ================================================================================
 
@@ -133,6 +194,7 @@ DEPLOYMENT ARCHITECTURE
 │  - Tracks experiments, parameters, metrics                   │
 │  - Stores model artifacts                                    │
 │  - Model registry (Staging/Production)                       │
+│  - Docker deployment via deployment/mlflow/                  │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -141,6 +203,7 @@ DEPLOYMENT ARCHITECTURE
 │  - GET  /health        : Health check                        │
 │  - POST /predict       : Single prediction                   │
 │  - POST /batch-predict : Batch predictions                   │
+│  - Dockerized via Dockerfile                                 │
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -149,6 +212,15 @@ DEPLOYMENT ARCHITECTURE
 │  - Input house features via forms                            │
 │  - Display predictions with confidence intervals             │
 │  - Connects to FastAPI backend                               │
+│  - Dockerized via streamlit_app/Dockerfile                   │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  GitHub Actions CI/CD                                        │
+│  - Automated ML pipeline execution                           │
+│  - MLflow Docker integration                                 │
+│  - Docker image build and publish to DockerHub              │
+│  - Artifact management and versioning                        │
 └──────────────────────────────────────────────────────────────┘
 
 
@@ -157,13 +229,19 @@ TECHNOLOGY STACK
 ================================================================================
 
 ML/DATA:        pandas, numpy, scikit-learn, xgboost
-TRACKING:       MLflow
+TRACKING:       MLflow (with Docker deployment)
 API:            FastAPI, Pydantic, uvicorn
 UI:             Streamlit
 CONTAINERIZATION: Docker, Docker Compose
+CI/CD:          GitHub Actions
 ORCHESTRATION:  Kubernetes (optional)
 TESTING:        pytest
 NOTEBOOK:       Jupyter Lab
+REGISTRY:       DockerHub (container images)
+VERSION CONTROL: Git, GitHub
+
+
+
 
 
 ================================================================================
@@ -177,24 +255,45 @@ uv pip install -r requirements.txt
 
 # Start MLflow Server
 cd deployment/mlflow
-docker compose up -d
+docker compose -f mlflow-docker-compose.yml up -d
+# Access at: http://localhost:5555
 
-# Run ML Pipeline
-python src/data/run_processing.py --input data/raw/house_data.csv --output data/processed/cleaned_house_data.csv
-python src/features/engineer.py --input data/processed/cleaned_house_data.csv --output data/processed/featured_house_data.csv --preprocessor models/trained/preprocessor.pkl
-python src/models/train_model.py --config configs/model_config.yaml --data data/processed/featured_house_data.csv --models-dir models --mlflow-tracking-uri http://localhost:5555
+# Run ML Pipeline (Local)
+python src/data/run_processing.py \
+  --input data/raw/house_data.csv \
+  --output data/processed/cleaned_house_data.csv
+
+python src/features/engineer.py \
+  --input data/processed/cleaned_house_data.csv \
+  --output data/processed/featured_house_data.csv \
+  --preprocessor models/trained/preprocessor.pkl
+
+python src/models/train_model.py \
+  --config configs/model_config.yaml \
+  --data data/processed/featured_house_data.csv \
+  --models-dir models \
+  --mlflow-tracking-uri http://localhost:5555
 
 # Run Tests
 pytest
+pytest -v  # verbose output
 
-# Deploy Services
+# Deploy Services (Docker Compose)
 docker compose up -d
+# or for Podman users:
+podman compose up -d
 
 # Access Services
 MLflow UI:    http://localhost:5555
 FastAPI:      http://localhost:8000
 API Docs:     http://localhost:8000/docs
 Streamlit UI: http://localhost:8501
+
+# GitHub Actions (Automated Pipeline)
+# Push to main branch or create version tag
+git tag v1.0.0
+git push origin v1.0.0
+# Pipeline runs automatically, builds Docker image
 
 
 ================================================================================
@@ -209,8 +308,49 @@ BEST PRACTICES
 6. Version control model artifacts via MLflow Model Registry
 7. Use configuration files for model hyperparameters
 8. Document data transformations and feature definitions
+9. Use GitHub Actions for automated pipeline execution
+10. Secure DockerHub credentials in GitHub Secrets
+11. Tag releases with semantic versioning (v1.0.0)
+12. Review docs/ directory before code generation
+13. Follow project guidelines in Dos-and-Dont-Rules.txt
+14. Refer to mlops-best-practices.txt for universal patterns
+15. Use custom Claude commands for common tasks
 
 
 ================================================================================
-END OF DOCUMENT
+ARTIFACT MANAGEMENT
 ================================================================================
+
+Local Artifacts:
+- data/processed/*.csv          (pipeline outputs)
+- models/trained/*.pkl          (trained models and preprocessors)
+- mlruns/                       (MLflow tracking - gitignored)
+
+GitHub Actions Artifacts:
+- cleaned-data                  (data processing output)
+- featured-data                 (feature engineering output)
+- preprocessor                  (fitted preprocessor)
+- trained-model                 (trained model pickle)
+- mlflow-artifacts              (MLflow experiment data)
+- Retention: 30 days
+
+DockerHub Artifacts:
+- <username>/house-price-model:latest
+- <username>/house-price-model:v1.0.0
+- <username>/house-price-model:1.0
+- <username>/house-price-model:main-sha256:...
+
+
+================================================================================
+ENVIRONMENT VARIABLES
+================================================================================
+
+Required for GitHub Actions:
+- DOCKERHUB_USERNAME (variable) : DockerHub account username
+- DOCKERHUB_TOKEN (secret)      : DockerHub access token
+
+Optional for Local Development:
+- MLFLOW_TRACKING_URI           : MLflow server URL (default: http://localhost:5555)
+- API_URL                       : FastAPI URL for Streamlit (default: http://fastapi:8000)
+
+

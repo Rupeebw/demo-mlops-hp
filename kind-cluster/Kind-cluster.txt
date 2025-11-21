@@ -1,0 +1,231 @@
+KIND KUBERNETES CLUSTER SETUP
+==============================
+
+TL;DR:
+Install kind → Create multi-node cluster → Verify nodes → Install Helm → Setup kube-ops-view → Load Docker images → Deploy FastAPI & Streamlit → Access apps (Streamlit: localhost:31300)
+
+
+INSTALL KIND
+------------
+
+# Install kind via Homebrew (macOS)
+brew install kind
+
+# Verify installation
+kind version
+
+Expected: kind v0.30.0 go1.25.4 darwin/arm64
+
+
+CREATE MULTI-NODE CLUSTER
+--------------------------
+
+# Delete existing cluster (if any)
+kind delete cluster --name mlops-cluster
+
+# Create cluster with config file
+kind create cluster --name mlops-cluster --config kind-cluster/kind-config.yml
+
+# Expected output: 3 nodes (1 control-plane + 2 workers)
+
+
+VERIFY CLUSTER
+--------------
+
+# List all clusters
+kind get clusters
+
+# Get cluster nodes
+kubectl get nodes
+
+# Expected output:
+# mlops-cluster-control-plane   Ready   control-plane
+# mlops-cluster-worker          Ready   <none>
+# mlops-cluster-worker2         Ready   <none>
+
+# Get detailed node info
+kubectl get nodes -o wide
+
+# Check Docker containers
+docker ps --filter "name=mlops-cluster"
+
+# Get cluster info
+kubectl cluster-info --context kind-mlops-cluster
+
+
+INSTALL HELM
+------------
+
+# Install Helm via Homebrew (macOS)
+brew install helm
+
+# Verify installation
+helm version
+
+Expected: version.BuildInfo{Version:"v4.0.0", ...}
+
+
+INSTALL KUBE-OPS-VIEW
+---------------------
+
+# Add Helm repository
+helm repo add k8s-at-home https://k8s-at-home.com/charts/
+
+# Update Helm repositories
+helm repo update
+
+# Install kube-ops-view chart
+helm install my-kube-ops-view k8s-at-home/kube-ops-view --version 1.1.2
+
+# Verify installation
+kubectl get pods -l "app.kubernetes.io/name=kube-ops-view"
+kubectl get services -l "app.kubernetes.io/name=kube-ops-view"
+helm list
+
+
+ACCESS KUBE-OPS-VIEW
+--------------------
+
+# Get pod name
+export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=kube-ops-view,app.kubernetes.io/instance=my-kube-ops-view" -o jsonpath="{.items[0].metadata.name}")
+
+# Port forward to localhost
+kubectl port-forward $POD_NAME 8080:8080
+
+# Access dashboard
+Open browser: http://127.0.0.1:8080
+
+# Stop port forwarding (when done)
+pkill -f "kubectl port-forward my-kube-ops-view"
+
+
+CLUSTER CONFIGURATION
+---------------------
+
+File: kind-cluster/kind-config.yml
+
+Configuration:
+- 1 control-plane node
+- 2 worker nodes
+- Exposed ports: 30000, 31300, 31321
+
+Port Mappings:
+- 30000: Reserved for services
+- 31300: Streamlit UI (deployed)
+- 31321: Reserved for services
+
+
+MLOPS APPLICATION DEPLOYMENT
+-----------------------------
+
+Deployed Applications:
+- FastAPI: House Price Prediction API (2 replicas)
+- Streamlit: Web UI Frontend (1 replica)
+
+Deployment Files Location:
+/Users/rupeshpanwar/Documents/AI-Projects/demo-mlops-project/kind-cluster/
+
+Files:
+- fastapi-deployment.yaml
+- fastapi-service.yaml
+- streamlit-deployment.yaml
+- streamlit-service.yaml
+
+
+DEPLOY APPLICATIONS
+-------------------
+
+# Load Docker images into Kind cluster
+kind load docker-image house-price-api:latest --name mlops-cluster
+kind load docker-image house-price-streamlit:latest --name mlops-cluster
+
+# Deploy FastAPI service
+kubectl apply -f kind-cluster/fastapi-deployment.yaml
+kubectl apply -f kind-cluster/fastapi-service.yaml
+
+# Deploy Streamlit app
+kubectl apply -f kind-cluster/streamlit-deployment.yaml
+kubectl apply -f kind-cluster/streamlit-service.yaml
+
+# Verify deployments
+kubectl get deployments
+kubectl get pods
+kubectl get services
+
+
+ACCESS DEPLOYED APPLICATIONS
+-----------------------------
+
+# Streamlit UI (via NodePort)
+Open browser: http://localhost:31300
+
+# FastAPI API (via port-forward)
+kubectl port-forward svc/fastapi-service 8000:8000
+Open browser: http://localhost:8000/docs
+
+# Test FastAPI health
+curl http://localhost:8000/health
+
+# Expected response:
+{"status":"healthy","model_loaded":true}
+
+
+DEPLOYMENT ARCHITECTURE
+-----------------------
+
+FastAPI Service:
+- Type: ClusterIP
+- Replicas: 2
+- Port: 8000
+- Resources: 512Mi-1Gi memory, 250m-500m CPU
+- Health checks: liveness and readiness probes
+
+Streamlit Service:
+- Type: NodePort
+- Replicas: 1
+- Port: 8501 (exposed as 31300)
+- Environment: API_URL=http://fastapi-service:8000
+- Resources: 256Mi-512Mi memory, 100m-250m CPU
+
+
+USEFUL COMMANDS
+---------------
+
+# Delete cluster
+kind delete cluster --name mlops-cluster
+
+# Load Docker image into cluster
+kind load docker-image <image-name>:tag --name mlops-cluster
+
+# Get kubeconfig
+kind get kubeconfig --name mlops-cluster
+
+# Export kubeconfig
+kind export kubeconfig --name mlops-cluster
+
+# View all namespaces
+kubectl get namespaces
+
+# View all pods
+kubectl get pods --all-namespaces
+
+# View all services
+kubectl get services --all-namespaces
+
+# Delete deployments
+kubectl delete -f kind-cluster/fastapi-deployment.yaml
+kubectl delete -f kind-cluster/fastapi-service.yaml
+kubectl delete -f kind-cluster/streamlit-deployment.yaml
+kubectl delete -f kind-cluster/streamlit-service.yaml
+
+# View pod logs
+kubectl logs -f <pod-name>
+
+# Describe pod for debugging
+kubectl describe pod <pod-name>
+
+# List Helm releases
+helm list
+
+# Uninstall Helm chart
+helm uninstall my-kube-ops-view
